@@ -36,19 +36,19 @@
 
 using namespace dealii;
 
-class parabolicBC : public Function<2>
+class parabolicBC : public Function<3>
 {
 public:
-	parabolicBC(double time) : Function<2>() { this->_time = time; }
+	parabolicBC(double time) : Function<3>() { this->_time = time; }
 	
-	virtual double value (const Point<2> &p, const unsigned int component = 0) const;
+	virtual double value (const Point<3> &p, const unsigned int component = 0) const;
 //	double ddy(const Point<2> &p) const;
 
 private:
 	double _time;
 };
 
-double parabolicBC::value(const Point<2> &p, const unsigned int) const
+double parabolicBC::value(const Point<3> &p, const unsigned int) const
 {
 	return  (_time > 10.0 ? 1.0 : _time / 10.0) *   (3.0 * sqrt(2 * p[1] + 1.0) );
 }
@@ -143,7 +143,7 @@ void riverDischarge::build_grid ()
 }
 
 void riverDischarge::import_unv_mesh(){
-    GridIn<2> gridin;
+    GridIn<3> gridin;
     gridin.attach_triangulation(tria);
     std::ifstream f("/home/andrew/dealii-run/river/repairedNewMesh.unv");
     gridin.read_unv(f);
@@ -163,7 +163,10 @@ void riverDischarge::setup_system()
     
     dof_handlerVy.distribute_dofs (feVy);
     std::cout << "Number of degrees of freedom Vy: " << dof_handlerVy.n_dofs() << std::endl;
-    
+
+    dof_handlerVz.distribute_dofs (feVz);
+    std::cout << "Number of degrees of freedom Vz: " << dof_handlerVz.n_dofs() << std::endl;
+
     dof_handlerP.distribute_dofs (feP);
     std::cout << "Number of degrees of freedom P: " << dof_handlerP.n_dofs() << std::endl;
     
@@ -193,7 +196,20 @@ void riverDischarge::setup_system()
     correctionVy.reinit (dof_handlerVy.n_dofs());
     old_solutionVy.reinit (dof_handlerVy.n_dofs());
     system_rVy.reinit (dof_handlerVy.n_dofs());
-    
+
+    //Vz
+    DynamicSparsityPattern dspVz(dof_handlerVz.n_dofs());
+    DoFTools::make_sparsity_pattern (dof_handlerVz, dspVz);
+    sparsity_patternVz.copy_from(dspVz);
+
+    system_mVz.reinit (sparsity_patternVz);
+
+    solutionVz.reinit (dof_handlerVz.n_dofs());
+    predictionVz.reinit (dof_handlerVz.n_dofs());
+    correctionVz.reinit (dof_handlerVz.n_dofs());
+    old_solutionVz.reinit (dof_handlerVz.n_dofs());
+    system_rVz.reinit (dof_handlerVz.n_dofs());
+
     //P
     DynamicSparsityPattern dspP(dof_handlerP.n_dofs());
     DoFTools::make_sparsity_pattern (dof_handlerP, dspP);
@@ -207,25 +223,26 @@ void riverDischarge::setup_system()
 }
 void riverDischarge::initialize_node_solutions()
 {
-    DoFHandler<2>::active_cell_iterator cell = dof_handlerVx.begin_active(), endc = dof_handlerVx.end();
+    DoFHandler<3>::active_cell_iterator cell = dof_handlerVx.begin_active(), endc = dof_handlerVx.end();
     solutionVx = 0.0;
     solutionVy = 0.0;
+    solutionVz = 0.0;
     solutionP = 0.0;
     solutionSal = referenceSalinity;
     
     for (; cell != endc; ++cell) {
         for (unsigned int i=0; i<4; ++i) {
-            solutionP(cell->vertex_dof_index(i,0))=100000.0-1000.0*9.81*(cell->vertex(i)[1]); //  было (15.0 - cell->vertex(i)[1]);
+            solutionP(cell->vertex_dof_index(i,0))=100000.0-1000.0*9.81*(cell->vertex(i)[2]); //  было (15.0 - cell->vertex(i)[1]);
         }
-        for (unsigned int face_number = 0; face_number<GeometryInfo<2>::faces_per_cell; ++face_number){
+        for (unsigned int face_number = 0; face_number<GeometryInfo<3>::faces_per_cell; ++face_number){
             if(cell->face(face_number)->at_boundary() && cell->face(face_number)->boundary_id() == 0){
-                for (unsigned int vert=0; vert<GeometryInfo<2>::vertices_per_face; ++vert){
+                for (unsigned int vert=0; vert<GeometryInfo<3>::vertices_per_face; ++vert){
                     solutionSal(cell->face(face_number)->vertex_dof_index(vert,0)) = 0.0;
                     boundaryDoFNumbers.insert(cell->face(face_number)->vertex_dof_index(vert,0));
                 }
             } else if(cell->face(face_number)->at_boundary() && cell->face(face_number)->boundary_id() == 2){
-                for (unsigned int vert=0; vert<GeometryInfo<2>::vertices_per_face; ++vert)
-                    openSeaDoFs.emplace(cell->face(face_number)->vertex_dof_index(vert,0), cell->face(face_number)->vertex(vert)[1]);
+                for (unsigned int vert=0; vert<GeometryInfo<3>::vertices_per_face; ++vert)
+                    openSeaDoFs.emplace(cell->face(face_number)->vertex_dof_index(vert,0), cell->face(face_number)->vertex(vert)[2]);
         }
      }
   }
@@ -236,20 +253,25 @@ void riverDischarge::assemble_system()
     
     old_solutionVx = solutionVx;
     old_solutionVy = solutionVy;
+    old_solutionVz = solutionVz;
     old_solutionP = solutionP;
-    
+
+    /*Idk if we need QGauss<3> here because we still calc on facet*/
     QGauss<2>   quadrature_formula(2);
     QGauss<1>   face_quadrature_formula(2);
     
-    FEValues<2> feVx_values (feVx, quadrature_formula, update_values | update_gradients | update_quadrature_points | update_JxW_values);
-    FEValues<2> feVy_values (feVy, quadrature_formula, update_values | update_gradients | update_quadrature_points | update_JxW_values);
-    FEValues<2> feP_values (feP, quadrature_formula, update_values | update_gradients | update_quadrature_points | update_JxW_values);
-    
-    FEFaceValues<2> feVy_face_values (feVy, face_quadrature_formula, update_values | update_gradients | update_quadrature_points | update_normal_vectors | update_JxW_values);
-    FEFaceValues<2> feP_face_values (feP, face_quadrature_formula, update_values | update_gradients | update_quadrature_points | update_normal_vectors | update_JxW_values);
-    FEFaceValues<2> feVx_face_values (feVx, face_quadrature_formula, update_values | update_gradients | update_quadrature_points | update_normal_vectors | update_JxW_values);
+    FEValues<3> feVx_values (feVx, quadrature_formula, update_values | update_gradients | update_quadrature_points | update_JxW_values);
+    FEValues<3> feVy_values (feVy, quadrature_formula, update_values | update_gradients | update_quadrature_points | update_JxW_values);
+    FEValues<3> feVz_values (feVz, quadrature_formula, update_values | update_gradients | update_quadrature_points | update_JxW_values);
+    FEValues<3> feP_values (feP, quadrature_formula, update_values | update_gradients | update_quadrature_points | update_JxW_values);
+
+    FEFaceValues<3> feVx_face_values (feVx, face_quadrature_formula, update_values | update_gradients | update_quadrature_points | update_normal_vectors | update_JxW_values);
+    FEFaceValues<3> feVy_face_values (feVy, face_quadrature_formula, update_values | update_gradients | update_quadrature_points | update_normal_vectors | update_JxW_values);
+    FEFaceValues<3> feVz_face_values (feVz, face_quadrature_formula, update_values | update_gradients | update_quadrature_points | update_normal_vectors | update_JxW_values);
+    FEFaceValues<3> feP_face_values (feP, face_quadrature_formula, update_values | update_gradients | update_quadrature_points | update_normal_vectors | update_JxW_values);
     const unsigned int   dofs_per_cellVx = feVx.dofs_per_cell,
     dofs_per_cellVy = feVy.dofs_per_cell,
+    dofs_per_cellVz = feVz.dofs_per_cell,
     dofs_per_cellP = feP.dofs_per_cell;
     
     const unsigned int   n_q_points = quadrature_formula.size();
@@ -257,14 +279,17 @@ void riverDischarge::assemble_system()
     
     FullMatrix<double>   local_matrixVx (dofs_per_cellVx, dofs_per_cellVx),
     local_matrixVy (dofs_per_cellVy, dofs_per_cellVy),
+    local_matrixVz (dofs_per_cellVz, dofs_per_cellVz),
     local_matrixP (dofs_per_cellP, dofs_per_cellP);
     
     Vector<double>       local_rhsVx (dofs_per_cellVx),
     local_rhsVy (dofs_per_cellVy),
+    local_rhsVz (dofs_per_cellVz),
     local_rhsP (dofs_per_cellP);
     
     std::vector<types::global_dof_index> local_dof_indicesVx (dofs_per_cellVx),
     local_dof_indicesVy (dofs_per_cellVy),
+    local_dof_indicesVz (dofs_per_cellVz),
     local_dof_indicesP (dofs_per_cellP);
     
     const double mu = 1e-3,
@@ -276,11 +301,13 @@ void riverDischarge::assemble_system()
         system_rVx=0.0;
         system_mVy=0.0;
         system_rVy=0.0;
+        system_mVz=0.0;
+        system_rVz=0.0;
         
         //Vx
         {
-            DoFHandler<2>::active_cell_iterator cell = dof_handlerVx.begin_active();
-            DoFHandler<2>::active_cell_iterator endc = dof_handlerVx.end();
+            DoFHandler<3>::active_cell_iterator cell = dof_handlerVx.begin_active();
+            DoFHandler<3>::active_cell_iterator endc = dof_handlerVx.end();
             
             for (; cell!=endc; ++cell) {
                 feVx_values.reinit (cell);
@@ -291,13 +318,13 @@ void riverDischarge::assemble_system()
                 
                 for (unsigned int q_index=0; q_index<n_q_points; ++q_index) {
                     for (unsigned int i=0; i<dofs_per_cellVx; ++i) {
-                        const Tensor<0,2> Ni_vel = feVx_values.shape_value (i,q_index);
-                        const Tensor<1,2> Ni_vel_grad = feVx_values.shape_grad (i,q_index);
+                        const Tensor<0,3> Ni_vel = feVx_values.shape_value (i,q_index);
+                        const Tensor<1,3> Ni_vel_grad = feVx_values.shape_grad (i,q_index);
                         
                         for (unsigned int j=0; j<dofs_per_cellVx; ++j) {
-                            const Tensor<0,2> Nj_vel = feVx_values.shape_value (j,q_index);
-                            const Tensor<1,2> Nj_vel_grad = feVx_values.shape_grad (j,q_index);
-                            const Tensor<1,2> Nj_p_grad = feP_values.shape_grad (j,q_index);
+                            const Tensor<0,3> Nj_vel = feVx_values.shape_value (j,q_index);
+                            const Tensor<1,3> Nj_vel_grad = feVx_values.shape_grad (j,q_index);
+                            const Tensor<1,3> Nj_p_grad = feP_values.shape_grad (j,q_index);
                             
                             local_matrixVx(i,j) += Ni_vel * Nj_vel  * feVx_values.JxW(q_index);
                             //implicit account for tau_ij
@@ -313,7 +340,7 @@ void riverDischarge::assemble_system()
                     }//i
                 }//q_index
                 
-                for (unsigned int face_number=0; face_number<GeometryInfo<2>::faces_per_cell; ++face_number)
+                for (unsigned int face_number=0; face_number<GeometryInfo<3>::faces_per_cell; ++face_number)
                     if (cell->face(face_number)->at_boundary() && (cell->face(face_number)->boundary_id() == 0 || cell->face(face_number)->boundary_id() == 2)){
                         feVy_face_values.reinit (cell, face_number);
                          feVx_face_values.reinit (cell, face_number);
@@ -363,7 +390,7 @@ void riverDischarge::assemble_system()
         MatrixTools::apply_boundary_values (boundary_valuesVx1, system_mVx,    predictionVx,    system_rVx);
         
         std::map<types::global_dof_index,double> boundary_valuesVx3;
-        VectorTools::interpolate_boundary_values (dof_handlerVx, 1, ConstantFunction<2>(0.0), boundary_valuesVx3);
+        VectorTools::interpolate_boundary_values (dof_handlerVx, 1, ConstantFunction<3>(0.0), boundary_valuesVx3);
         MatrixTools::apply_boundary_values (boundary_valuesVx3, system_mVx, predictionVx, system_rVx);
         
         /*positiveVxDoFNumbers.clear();
@@ -382,8 +409,8 @@ void riverDischarge::assemble_system()
         
         //Vy
         {
-            DoFHandler<2>::active_cell_iterator cell = dof_handlerVy.begin_active();
-            DoFHandler<2>::active_cell_iterator endc = dof_handlerVy.end();
+            DoFHandler<3>::active_cell_iterator cell = dof_handlerVy.begin_active();
+            DoFHandler<3>::active_cell_iterator endc = dof_handlerVy.end();
             
             for (; cell!=endc; ++cell) {
                 feVx_values.reinit (cell);
@@ -394,13 +421,13 @@ void riverDischarge::assemble_system()
                 
                 for (unsigned int q_index=0; q_index<n_q_points; ++q_index) {
                     for (unsigned int i=0; i<dofs_per_cellVy; ++i) {
-                        const Tensor<0,2> Ni_vel = feVy_values.shape_value (i,q_index);
-                        const Tensor<1,2> Ni_vel_grad = feVy_values.shape_grad (i,q_index);
+                        const Tensor<0,3> Ni_vel = feVy_values.shape_value (i,q_index);
+                        const Tensor<1,3> Ni_vel_grad = feVy_values.shape_grad (i,q_index);
                         
                         for (unsigned int j=0; j<dofs_per_cellVy; ++j) {
-                            const Tensor<0,2> Nj_vel = feVy_values.shape_value (j,q_index);
-                            const Tensor<1,2> Nj_vel_grad = feVy_values.shape_grad (j,q_index);
-                            const Tensor<1,2> Nj_p_grad = feP_values.shape_grad (j,q_index);
+                            const Tensor<0,3> Nj_vel = feVy_values.shape_value (j,q_index);
+                            const Tensor<1,3> Nj_vel_grad = feVy_values.shape_grad (j,q_index);
+                            const Tensor<1,3> Nj_p_grad = feP_values.shape_grad (j,q_index);
                             
                             local_matrixVy(i,j) += Ni_vel * Nj_vel * feVy_values.JxW(q_index);
                             //implicit account for tau_ij
@@ -420,7 +447,7 @@ void riverDischarge::assemble_system()
                     }//i
                 }//q_index
                 
-                for (unsigned int face_number=0; face_number<GeometryInfo<2>::faces_per_cell; ++face_number)
+                for (unsigned int face_number=0; face_number<GeometryInfo<3>::faces_per_cell; ++face_number)
                     if (cell->face(face_number)->at_boundary() && (cell->face(face_number)->boundary_id() == 2)){
                         feVy_face_values.reinit (cell, face_number);
                         feVx_face_values.reinit (cell, face_number);
@@ -453,15 +480,15 @@ void riverDischarge::assemble_system()
         }//Vy
         
         std::map<types::global_dof_index,double> boundary_valuesVy1;
-        VectorTools::interpolate_boundary_values (dof_handlerVy, 0, ConstantFunction<2>(0.0), boundary_valuesVy1);
+        VectorTools::interpolate_boundary_values (dof_handlerVy, 0, ConstantFunction<3>(0.0), boundary_valuesVy1);
         MatrixTools::apply_boundary_values (boundary_valuesVy1, system_mVy, predictionVy, system_rVy);
         
         std::map<types::global_dof_index,double> boundary_valuesVy4;
-        VectorTools::interpolate_boundary_values (dof_handlerVy, 1, ConstantFunction<2>(0.0), boundary_valuesVy4);
+        VectorTools::interpolate_boundary_values (dof_handlerVy, 1, ConstantFunction<3>(0.0), boundary_valuesVy4);
         MatrixTools::apply_boundary_values (boundary_valuesVy4, system_mVy, predictionVy, system_rVy);
         
         std::map<types::global_dof_index,double> boundary_valuesVy2;
-        VectorTools::interpolate_boundary_values (dof_handlerVy, 3, ConstantFunction<2>(0.0), boundary_valuesVy2);
+        VectorTools::interpolate_boundary_values (dof_handlerVy, 3, ConstantFunction<3>(0.0), boundary_valuesVy2);
         MatrixTools::apply_boundary_values (boundary_valuesVy2, system_mVy, predictionVy, system_rVy);
         
         /*if(!positiveVxDoFNumbers.empty()){
@@ -475,14 +502,11 @@ void riverDischarge::assemble_system()
         solveVy ();
         
         //P
-        
-        for (int n_cor=0; n_cor<1; ++n_cor){
             system_mP=0.0;
             system_rP=0.0;
-            
             {
-                DoFHandler<2>::active_cell_iterator cell = dof_handlerP.begin_active();
-                DoFHandler<2>::active_cell_iterator endc = dof_handlerP.end();
+                DoFHandler<3>::active_cell_iterator cell = dof_handlerP.begin_active();
+                DoFHandler<3>::active_cell_iterator endc = dof_handlerP.end();
                 
                 for (; cell!=endc; ++cell) {
                     local_matrixP = 0.0;
@@ -493,11 +517,11 @@ void riverDischarge::assemble_system()
                     
                     for (unsigned int q_index=0; q_index<n_q_points; ++q_index) {
                         for (unsigned int i=0; i<dofs_per_cellP; ++i) {
-                            const Tensor<1,2> Nidx_pres = feP_values.shape_grad (i,q_index);
+                            const Tensor<1,3> Nidx_pres = feP_values.shape_grad (i,q_index);
                             
                             for (unsigned int j=0; j<dofs_per_cellP; ++j) {
-                                const Tensor<0,2> Nj_vel = feVx_values.shape_value (j,q_index);
-                                const Tensor<1,2> Njdx_pres = feP_values.shape_grad (j,q_index);
+                                const Tensor<0,3> Nj_vel = feVx_values.shape_value (j,q_index);
+                                const Tensor<1,3> Njdx_pres = feP_values.shape_grad (j,q_index);
                                 
                                 local_matrixP(i,j) += Nidx_pres * Njdx_pres * feP_values.JxW(q_index);
                                 
@@ -508,7 +532,7 @@ void riverDischarge::assemble_system()
                         }//i
                     }//q_index
                     
-                    for (unsigned int face_number=0; face_number<GeometryInfo<2>::faces_per_cell; ++face_number)
+                    for (unsigned int face_number=0; face_number<GeometryInfo<3>::faces_per_cell; ++face_number)
                         /*if (cell->face(face_number)->at_boundary() && (cell->face(face_number)->boundary_id() == 0)){
                             feP_face_values.reinit (cell, face_number);
                             
@@ -544,7 +568,7 @@ void riverDischarge::assemble_system()
             }//P
             
             std::map<types::global_dof_index,double> boundary_valuesP1;
-            VectorTools::interpolate_boundary_values (dof_handlerP, 3, ConstantFunction<2>(100000.0), boundary_valuesP1);
+            VectorTools::interpolate_boundary_values (dof_handlerP, 3, ConstantFunction<3>(100000.0), boundary_valuesP1);
             MatrixTools::apply_boundary_values (boundary_valuesP1, system_mP, solutionP, system_rP);
 
             std::map<types::global_dof_index,double> boundary_valuesP2;
@@ -559,8 +583,8 @@ void riverDischarge::assemble_system()
                 system_mVx = 0.0;
                 system_rVx = 0.0;
                 
-                DoFHandler<2>::active_cell_iterator cell = dof_handlerVx.begin_active();
-                DoFHandler<2>::active_cell_iterator endc = dof_handlerVx.end();
+                DoFHandler<3>::active_cell_iterator cell = dof_handlerVx.begin_active();
+                DoFHandler<3>::active_cell_iterator endc = dof_handlerVx.end();
                 
                 for (; cell!=endc; ++cell) {
                     feVx_values.reinit (cell);
@@ -571,11 +595,11 @@ void riverDischarge::assemble_system()
                     
                     for (unsigned int q_index=0; q_index<n_q_points; ++q_index) {
                         for (unsigned int i=0; i<dofs_per_cellVx; ++i) {
-                            const Tensor<0,2> Ni_vel = feVx_values.shape_value (i,q_index);
+                            const Tensor<0,3> Ni_vel = feVx_values.shape_value (i,q_index);
                             
                             for (unsigned int j=0; j<dofs_per_cellVx; ++j) {
-                                const Tensor<0,2> Nj_vel = feVx_values.shape_value (j,q_index);
-                                const Tensor<1,2> Nj_p_grad = feP_values.shape_grad (j,q_index);
+                                const Tensor<0,3> Nj_vel = feVx_values.shape_value (j,q_index);
+                                const Tensor<1,3> Nj_p_grad = feP_values.shape_grad (j,q_index);
                                 
                                 local_matrixVx(i,j) += Ni_vel * Nj_vel * feVx_values.JxW(q_index);
                                 
@@ -595,11 +619,11 @@ void riverDischarge::assemble_system()
                 }//cell
                 
                 std::map<types::global_dof_index,double> boundary_valuesVx1;
-                VectorTools::interpolate_boundary_values (dof_handlerVx, 0, ConstantFunction<2>(0.0), boundary_valuesVx1);
+                VectorTools::interpolate_boundary_values (dof_handlerVx, 0, ConstantFunction<3>(0.0), boundary_valuesVx1);
                 MatrixTools::apply_boundary_values (boundary_valuesVx1, system_mVx,    correctionVx, system_rVx);
                 
                 std::map<types::global_dof_index,double> boundary_valuesVx3;
-                VectorTools::interpolate_boundary_values (dof_handlerVx, 1, ConstantFunction<2>(0.0), boundary_valuesVx3);
+                VectorTools::interpolate_boundary_values (dof_handlerVx, 1, ConstantFunction<3>(0.0), boundary_valuesVx3);
                 MatrixTools::apply_boundary_values (boundary_valuesVx3, system_mVx, correctionVx, system_rVx);
                 
                 /*if(!positiveVxDoFNumbers.empty()){
@@ -617,8 +641,8 @@ void riverDischarge::assemble_system()
                 system_mVy = 0.0;
                 system_rVy = 0.0;
                 
-                DoFHandler<2>::active_cell_iterator cell = dof_handlerVy.begin_active();
-                DoFHandler<2>::active_cell_iterator endc = dof_handlerVy.end();
+                DoFHandler<3>::active_cell_iterator cell = dof_handlerVy.begin_active();
+                DoFHandler<3>::active_cell_iterator endc = dof_handlerVy.end();
                 
                 for (; cell!=endc; ++cell) {
                     feVx_values.reinit (cell);
@@ -629,11 +653,11 @@ void riverDischarge::assemble_system()
                     
                     for (unsigned int q_index=0; q_index<n_q_points; ++q_index) {
                         for (unsigned int i=0; i<dofs_per_cellVy; ++i) {
-                            const Tensor<0,2> Ni_vel = feVy_values.shape_value (i,q_index);
+                            const Tensor<0,3> Ni_vel = feVy_values.shape_value (i,q_index);
                             
                             for (unsigned int j=0; j<dofs_per_cellVy; ++j) {
-                                const Tensor<0,2> Nj_vel = feVy_values.shape_value (j,q_index);
-                                const Tensor<1,2> Nj_p_grad = feP_values.shape_grad (j,q_index);
+                                const Tensor<0,3> Nj_vel = feVy_values.shape_value (j,q_index);
+                                const Tensor<1,3> Nj_p_grad = feP_values.shape_grad (j,q_index);
                                 
                                 local_matrixVy(i,j) += Ni_vel * Nj_vel * feVy_values.JxW(q_index);
                                 
@@ -653,15 +677,15 @@ void riverDischarge::assemble_system()
                 }//cell
                 
                 std::map<types::global_dof_index,double> boundary_valuesVy1;
-                VectorTools::interpolate_boundary_values (dof_handlerVy, 0, ConstantFunction<2>(0.0), boundary_valuesVy1);
+                VectorTools::interpolate_boundary_values (dof_handlerVy, 0, ConstantFunction<3>(0.0), boundary_valuesVy1);
                 MatrixTools::apply_boundary_values (boundary_valuesVy1, system_mVy, correctionVy, system_rVy);
                 
                 std::map<types::global_dof_index,double> boundary_valuesVy3;
-                VectorTools::interpolate_boundary_values (dof_handlerVy, 1, ConstantFunction<2>(0.0), boundary_valuesVy3);
+                VectorTools::interpolate_boundary_values (dof_handlerVy, 1, ConstantFunction<3>(0.0), boundary_valuesVy3);
                 MatrixTools::apply_boundary_values (boundary_valuesVy3, system_mVy, correctionVy, system_rVy);
                 
                 std::map<types::global_dof_index,double> boundary_valuesVy4;
-                VectorTools::interpolate_boundary_values (dof_handlerVy, 3, ConstantFunction<2>(0.0), boundary_valuesVy4);
+                VectorTools::interpolate_boundary_values (dof_handlerVy, 3, ConstantFunction<3>(0.0), boundary_valuesVy4);
                 MatrixTools::apply_boundary_values (boundary_valuesVy4, system_mVy, correctionVy, system_rVy);
                 
                 /*if(!positiveVxDoFNumbers.empty()){
@@ -681,7 +705,7 @@ void riverDischarge::assemble_system()
             solutionVy += correctionVy;
             
             old_solutionP = solutionP;
-        }//n_cor
+
     }
 }
 
@@ -718,6 +742,21 @@ void riverDischarge::solveVy(bool correction)
     else std::cout << "Solver for Vy failed to converge" << std::endl;
 }
 
+void riverDischarge::solveVz(bool correction)
+{
+    SolverControl solver_control (10000, 1e-12);
+    SolverBicgstab<> solver (solver_control);
+    PreconditionJacobi<> preconditioner;
+
+    preconditioner.initialize(system_mVz, 1.0);
+    if(correction) solver.solve (system_mVz, correctionVz, system_rVz, preconditioner);
+    else solver.solve (system_mVz, predictionVz, system_rVz, preconditioner);
+
+    if(solver_control.last_check() == SolverControl::success)
+        std::cout << "Solver for Vz converged with residual=" << solver_control.last_value() << ", no. of iterations=" << solver_control.last_step() << std::endl;
+    else std::cout << "Solver for Vz failed to converge" << std::endl;
+}
+
 void riverDischarge::solveP()
 {
     SolverControl solver_control (10000, 1e-12);
@@ -740,19 +779,23 @@ void riverDischarge::output_results(bool predictionCorrection)
 {
     TimerOutput::Scope timer_section(*timer, "Results output");
     
-    DataOut<2> data_out;
+    DataOut<3> data_out;
     
     data_out.attach_dof_handler (dof_handlerVx);
     data_out.add_data_vector (solutionVx, "Vx");
     data_out.add_data_vector (solutionVy, "Vy");
+    data_out.add_data_vector (solutionVy, "Vz");
     data_out.add_data_vector (solutionP, "P");
     data_out.add_data_vector (solutionSal, "Salinity");
     
     if(predictionCorrection){
         data_out.add_data_vector (predictionVx, "predVx");
         data_out.add_data_vector (predictionVy, "predVy");
+        data_out.add_data_vector (predictionVz, "predVz");
         data_out.add_data_vector (correctionVx, "corVx");
         data_out.add_data_vector (correctionVy, "corVy");
+        data_out.add_data_vector (correctionVz, "corVz");
+
     }
     
     data_out.build_patches ();
@@ -795,7 +838,8 @@ void riverDischarge::output_results(bool predictionCorrection)
     output2 << "POINT_DATA " << particle_handler.n_global_particles() << std::endl;
     output2 << "VECTORS velocity float" << std::endl;
     for(auto particleIndex = particle_handler.begin(); particleIndex != particle_handler.end(); ++particleIndex){
-        output2 << (*particleIndex).second->get_velocity_component(0) << " " << (*particleIndex).second->get_velocity_component(1) << " 0" << std::endl;
+        output2 << (*particleIndex).second->get_velocity_component(0) << " " << (*particleIndex).second->get_velocity_component(1)\
+        << " " << (*particleIndex).second->get_velocity_component(2) << " 0" << std::endl;
     }
     
     output2 << "SCALARS salinity float" << std::endl << " LOOKUP_TABLE default" <<std::endl;
@@ -817,7 +861,7 @@ void riverDischarge::run()
     import_unv_mesh();
     setup_system();
     initialize_node_solutions();
-    seed_particles({2, 2});
+    seed_particles({2, 2, 2});
 
     system("rm solution-*.vtk");
     system("rm particles-*.vtk");
