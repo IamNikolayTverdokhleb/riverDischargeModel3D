@@ -127,7 +127,7 @@ Triangulation<3>::cell_iterator pfem2Particle::get_surrounding_cell(const Triang
 	return cell;
 }
 
-unsigned int pfem2Particle::find_closest_vertex_of_cell(const typename Triangulation<2>::active_cell_iterator &cell, const Mapping<3> &mapping)
+unsigned int pfem2Particle::find_closest_vertex_of_cell(const typename Triangulation<3>::active_cell_iterator &cell, const Mapping<3> &mapping)
 {
 	//transformation of local particle coordinates transformation is required as the global particle coordinates have already been updated by the time this function is called
 	const Point<3> old_position = mapping.transform_unit_to_real_cell(cell, reference_location);
@@ -481,7 +481,7 @@ pfem2Solver::pfem2Solver()
 	feVy (1),
 	feVz (1),
 	feP (1),
-	fe(FE_Q<2>(1), 1),
+	fe(FE_Q<3>(1), 1),
 	dof_handlerVx (tria),
 	dof_handlerVy (tria),
 	dof_handlerP (tria),
@@ -508,7 +508,7 @@ void pfem2Solver::seed_particles_into_cell (const typename DoFHandler<3>::cell_i
 		for(unsigned int j = 0; j < quantities[1]; ++j){
             for(unsigned int k = 0; k < quantities[2]; ++k) {
                 pfem2Particle *particle = new pfem2Particle(
-                        mapping.transform_unit_to_real_cell(cell, Point<3>((i + 1.0 / 2) * hx, (j + 1.0 / 2) * hy),(j + 1.0 / 2) * hz)),
+                        mapping.transform_unit_to_real_cell(cell, Point<3>((i + 1.0 / 2) * hx, (j + 1.0 / 2) * hy,(j + 1.0 / 2) * hz)),
                         Point<3>((i + 1.0 / 2) * hx, (j + 1.0 / 2) * hy, (k + 1.0 / 2) * hz), ++particleCount);
                 particle_handler.insert_particle(particle, cell);
 
@@ -539,7 +539,7 @@ void pfem2Solver::seed_particles_into_cell (const typename DoFHandler<3>::cell_i
 	//определение, в каких частях ячейки лежат частицы
 	double hx = 1.0/quantities[0];
 	double hy = 1.0/quantities[1];
-    double hy = 1.0/quantities[2];
+    double hz = 1.0/quantities[2];
 	
 	unsigned int num_x, num_y, num_z;
 	for(auto particleIndex = particle_handler.particles_in_cell_begin(cell); particleIndex != particle_handler.particles_in_cell_end(cell); ++particleIndex){
@@ -558,7 +558,7 @@ void pfem2Solver::seed_particles_into_cell (const typename DoFHandler<3>::cell_i
             for(unsigned int k = 0; k < quantities[2]; k++) {
                 if (!particlesInParts[{i, j, k}]) {
                     pfem2Particle *particle = new pfem2Particle(
-                            mapping.transform_unit_to_real_cell(cell, Point<3>((i + 1.0 / 2) * hx, (j + 1.0 / 2) * hy), (k + 1.0 / 2) * hz)),
+                            mapping.transform_unit_to_real_cell(cell, Point<3>((i + 1.0 / 2) * hx, (j + 1.0 / 2) * hy, (k + 1.0 / 2) * hz)),
                             Point<3>((i + 1.0 / 2) * hx, (j + 1.0 / 2) * hy, (k + 1.0 / 2) * hz), ++particleCount);
                     particle_handler.insert_particle(particle, cell);
 
@@ -732,7 +732,7 @@ void pfem2Solver::distribute_particle_velocities_to_grid() //перенос ск
 }
 
 void pfem2Solver::calculate_loads(types::boundary_id patch_id, std::ofstream *out){
-	TimerOutput::Scope timer_section(*timer, "Loads calculation");
+	/*TimerOutput::Scope timer_section(*timer, "Loads calculation");
 	
 	DoFHandler<2>::active_cell_iterator cell = dof_handlerP.begin_active(), endc = dof_handlerP.end();
 	QGauss<1> face_quadrature_formula(2);
@@ -773,8 +773,10 @@ void pfem2Solver::calculate_loads(types::boundary_id patch_id, std::ofstream *ou
 		for(std::vector<unsigned int>::iterator it = probeDoFnumbers.begin(); it != probeDoFnumbers.end(); ++it) p_point += solutionP(*it);
 		p_point /= probeDoFnumbers.size();
 	}
+	 */
 			
-	*out << time << ";" << Fx << ";" << Fy << ";" << p_point /*<< ";" << Cx << ";" << Cy << ";"*/ << std::endl;
+	//*out << time << ";" << Fx << ";" << Fy << ";" << p_point /*<< ";" << Cx << ";" << Cy << ";"*/ << std::endl;
 	
 	//std::cout << "Calculating loads finished" << std::endl;
+
 }

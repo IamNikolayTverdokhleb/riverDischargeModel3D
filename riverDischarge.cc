@@ -69,14 +69,15 @@ public:
     void assemble_system();
     void solveVx(bool correction = false);
     void solveVy(bool correction = false);
+    void solveVz(bool correction = false);
     void solveP();
     void output_results(bool predictionCorrection = false);
     void import_unv_mesh();
     void run();
     
-    SparsityPattern sparsity_patternVx, sparsity_patternVy, sparsity_patternP;
-    SparseMatrix<double> system_mVx, system_mVy, system_mP;
-    Vector<double> system_rVx, system_rVy, system_rP;
+    SparsityPattern sparsity_patternVx, sparsity_patternVy,  sparsity_patternVz, sparsity_patternP;
+    SparseMatrix<double> system_mVx, system_mVy,  system_mVz, system_mP;
+    Vector<double> system_rVx, system_rVy,system_rVz, system_rP;
     // const double theta;
     //  const double alpha;
     
@@ -101,7 +102,7 @@ riverDischarge::riverDischarge()
  */
 void riverDischarge::build_grid ()
 {
-    TimerOutput::Scope timer_section(*timer, "Mesh construction");
+    /*TimerOutput::Scope timer_section(*timer, "Mesh construction");
     
     const Point<2> bottom_left = Point<2> (0.0,0.0);
     const Point<2> top_right = Point<2> (100.0,15.0);
@@ -140,6 +141,7 @@ void riverDischarge::build_grid ()
     std::ofstream out2 ("riverDischarge.vtk");
     grid_out.write_vtk (tria, out2);
     std::cout << "Grid written to VTK" << std::endl;
+     */
 }
 
 void riverDischarge::import_unv_mesh(){
@@ -257,8 +259,8 @@ void riverDischarge::assemble_system()
     old_solutionP = solutionP;
 
     /*Idk if we need QGauss<3> here because we still calc on facet*/
-    QGauss<2>   quadrature_formula(2);
-    QGauss<1>   face_quadrature_formula(2);
+    QGauss<3>   quadrature_formula(3);
+    QGauss<2>   face_quadrature_formula(3);
     
     FEValues<3> feVx_values (feVx, quadrature_formula, update_values | update_gradients | update_quadrature_points | update_JxW_values);
     FEValues<3> feVy_values (feVy, quadrature_formula, update_values | update_gradients | update_quadrature_points | update_JxW_values);
