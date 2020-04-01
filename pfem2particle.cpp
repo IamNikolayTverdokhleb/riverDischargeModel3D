@@ -484,6 +484,7 @@ pfem2Solver::pfem2Solver()
 	fe(FE_Q<3>(1), 1),
 	dof_handlerVx (tria),
 	dof_handlerVy (tria),
+	dof_handlerVz (tria),
 	dof_handlerP (tria),
 	quantities({0,0,0})
 {
@@ -508,7 +509,7 @@ void pfem2Solver::seed_particles_into_cell (const typename DoFHandler<3>::cell_i
 		for(unsigned int j = 0; j < quantities[1]; ++j){
             for(unsigned int k = 0; k < quantities[2]; ++k) {
                 pfem2Particle *particle = new pfem2Particle(
-                        mapping.transform_unit_to_real_cell(cell, Point<3>((i + 1.0 / 2) * hx, (j + 1.0 / 2) * hy,(j + 1.0 / 2) * hz)),
+                        mapping.transform_unit_to_real_cell(cell, Point<3>((i + 1.0 / 2) * hx, (j + 1.0 / 2) * hy,(k + 1.0 / 2) * hz)),
                         Point<3>((i + 1.0 / 2) * hx, (j + 1.0 / 2) * hy, (k + 1.0 / 2) * hz), ++particleCount);
                 particle_handler.insert_particle(particle, cell);
 

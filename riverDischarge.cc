@@ -147,7 +147,7 @@ void riverDischarge::build_grid ()
 void riverDischarge::import_unv_mesh(){
     GridIn<3> gridin;
     gridin.attach_triangulation(tria);
-    std::ifstream f("/home/andrew/dealii-run/river/repairedNewMesh.unv");
+    std::ifstream f("/home/andrew/dealii-run/Mesh_repairing/Cube_Mesh_Trial.unv");
     gridin.read_unv(f);
     //GridOut grid_out;
 
@@ -259,8 +259,8 @@ void riverDischarge::assemble_system()
     old_solutionP = solutionP;
 
     /*Idk if we need QGauss<3> here because we still calc on facet*/
-    QGauss<3>   quadrature_formula(3);
-    QGauss<2>   face_quadrature_formula(3);
+    QGauss<3>   quadrature_formula(2);
+    QGauss<2>   face_quadrature_formula(2);
     
     FEValues<3> feVx_values (feVx, quadrature_formula, update_values | update_gradients | update_quadrature_points | update_JxW_values);
     FEValues<3> feVy_values (feVy, quadrature_formula, update_values | update_gradients | update_quadrature_points | update_JxW_values);
@@ -959,7 +959,7 @@ void riverDischarge::output_results(bool predictionCorrection)
     output2 << "POINTS " << particle_handler.n_global_particles() << " float" << std::endl;
     for(std::unordered_multimap<int, pfem2Particle*>::iterator particleIndex = particle_handler.begin();
         particleIndex != particle_handler.end(); ++particleIndex){
-        output2 << (*particleIndex).second->get_location() << " 0" << std::endl;
+        output2 << (*particleIndex).second->get_location() << std::endl;
     }
     
     output2 << std::endl;
@@ -983,7 +983,7 @@ void riverDischarge::output_results(bool predictionCorrection)
     output2 << "VECTORS velocity float" << std::endl;
     for(auto particleIndex = particle_handler.begin(); particleIndex != particle_handler.end(); ++particleIndex){
         output2 << (*particleIndex).second->get_velocity_component(0) << " " << (*particleIndex).second->get_velocity_component(1)\
-        << " " << (*particleIndex).second->get_velocity_component(2) << " 0" << std::endl;
+        << " " << (*particleIndex).second->get_velocity_component(2)  << std::endl;
     }
     
     output2 << "SCALARS salinity float" << std::endl << " LOOKUP_TABLE default" <<std::endl;
