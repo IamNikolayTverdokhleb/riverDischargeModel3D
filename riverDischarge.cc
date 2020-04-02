@@ -887,14 +887,16 @@ void riverDischarge::assemble_system()
                             const Tensor<0,3> Nj_vel = feVz_values.shape_value (j,q_index);
                             const Tensor<1,3> Nj_p_grad = feP_values.shape_grad (j,q_index);
 
-                            local_matrixVz(i,j) += Ni_vel * Nj_vel * feVy_values.JxW(q_index);
+                            local_matrixVz(i,j) += Ni_vel * Nj_vel * feVz_values.JxW(q_index);
+                            //::cout << local_matrixVz(i,j) << std::endl;
 
                             local_rhsVz(i) -= time_step/rho * Ni_vel * Nj_p_grad[2] * (solutionP(cell->vertex_dof_index(j,0))/* - old_solutionP(cell->vertex_dof_index(j,0))*/) * feVy_values.JxW (q_index);
+                            //std::cout << local_rhsVz(i) << std::endl;
                         }//j
                     }//i
                 }//q_index
 
-                cell->get_dof_indices (local_dof_indicesVy);
+                cell->get_dof_indices (local_dof_indicesVz);
 
                 for (unsigned int i=0; i<dofs_per_cellVz; ++i)
                     for (unsigned int j=0; j<dofs_per_cellVz; ++j)
