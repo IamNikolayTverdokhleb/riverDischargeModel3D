@@ -235,7 +235,7 @@ void riverDischarge::initialize_node_solutions()
     
     for (; cell != endc; ++cell) {
         for (unsigned int i=0; i<4; ++i) {
-            solutionP(cell->vertex_dof_index(i,0))=100000.0-1000.0*9.81*((cell->vertex(i)[2er]) - 4);
+            solutionP(cell->vertex_dof_index(i,0))=100000.0-1000.0*9.81*((cell->vertex(i)[2]) - h);
         }
         for (unsigned int face_number = 0; face_number<GeometryInfo<3>::faces_per_cell; ++face_number){
             if(cell->face(face_number)->at_boundary() && cell->face(face_number)->boundary_id() == 4){
@@ -685,7 +685,8 @@ void riverDischarge::assemble_system()
                                 for (unsigned int i=0; i<dofs_per_cellP; ++i)
                                     local_rhsP(i) -= rho / time_step * feP_face_values.shape_value(i,q_point) * (3.0) *    //СКОРОСТЬ В МЕСТЕ ВПАДЕНИЯ
 										feP_face_values.normal_vector(q_point)[0] * feP_face_values.JxW(q_point);
-                        } else */if (cell->face(face_number)->at_boundary() && (cell->face(face_number)->boundary_id() == 0 || cell->face(face_number)->boundary_id() == 2)){
+                        } else */if (cell->face(face_number)->at_boundary() && (cell->face(face_number)->boundary_id() == 0 || cell->face(face_number)->boundary_id() == 1 || cell->face(face_number)->boundary_id() == 2 || cell->face(face_number)->boundary_id() == 3 ||\
+                        cell->face(face_number)->boundary_id() == 4 || cell->face(face_number)->boundary_id() == 5)){
                             feP_face_values.reinit (cell, face_number);
                             feVx_face_values.reinit (cell, face_number);
                             feVy_face_values.reinit (cell, face_number);
