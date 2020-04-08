@@ -183,7 +183,7 @@ public:
 	
 	std::vector<unsigned int> probeDoFnumbers;
     std::set<unsigned int> boundaryDoFNumbers;	//номера степеней свободы, соленость в которых необходимо принудительно обнулять (место впадения реки)
-    std::unordered_map<unsigned int, double> openSeaDoFs;	//номера степеней свободы, в которых надо проверять знак горизонтальной скорости для смены типа ГУ ("открытое море"), и их координата y
+    std::unordered_map<unsigned int, double> openSeaDoFs;	//номера степеней свободы, в которых надо проверять знак горизонтальной скорости для смены типа ГУ ("открытое море"), и их координата z
 	
 protected:
 	void seed_particles_into_cell (const typename DoFHandler<3>::cell_iterator &cell);
