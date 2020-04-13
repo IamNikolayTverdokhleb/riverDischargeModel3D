@@ -345,7 +345,9 @@ void riverDischarge::assemble_system()
                     }//i
                 }//q_index
 
-
+                unsigned int face_numbe1r=0;
+                auto a = face_numbe1r<GeometryInfo<3>::faces_per_cell;
+                std::cout << "iter "  <<  a << std::endl;
                 for (unsigned int face_number=0; face_number<GeometryInfo<3>::faces_per_cell; ++face_number) {
                     if (cell->face(face_number)->at_boundary() &&
                         (cell->face(face_number)->boundary_id() == 0 || cell->face(face_number)->boundary_id() == 2)) {
@@ -360,7 +362,7 @@ void riverDischarge::assemble_system()
                                 tempX += ((4.0 / 3.0) * feVx_face_values.shape_grad(i, q_point)[0] *
                                           old_solutionVx(cell->vertex_dof_index(i, 0)) -
                                           (2.0 / 3.0) * feVy_face_values.shape_grad(i, q_point)[1] *
-                                          old_solutionVy(cell->vertex_dof_index(i, 0)) /
+                                          old_solutionVy(cell->vertex_dof_index(i, 0))
                                           -(2.0 / 3.0) * feVz_face_values.shape_grad(i, q_point)[2] *
                                           old_solutionVz(cell->vertex_dof_index(i, 0)));
 
@@ -387,7 +389,7 @@ void riverDischarge::assemble_system()
                                 std::cout << "Integral :  " << feVy_face_values.JxW(q_point) << std::endl;
                                 local_rhsVx(i) += (mu / rho) * time_step * feVy_face_values.shape_value(i, q_point) *
                                                   (tempX * feVy_face_values.normal_vector(q_point)[0] +
-                                                   tempY * feVy_face_values.normal_vector(q_point)[1] /
+                                                   tempY * feVy_face_values.normal_vector(q_point)[1]
                                                    +tempZ * feVy_face_values.normal_vector(q_point)[2]) *
                                                   feVy_face_values.JxW(q_point);
                                 std::cout << "rhs:  " << local_rhsVx(i) << std::endl;
@@ -520,14 +522,14 @@ void riverDischarge::assemble_system()
                             {
                                 tempX += (feVx_face_values.shape_grad(i,q_point)[1] * old_solutionVx(cell->vertex_dof_index(i,0)) + feVy_face_values.shape_grad(i,q_point)[0] * old_solutionVy(cell->vertex_dof_index(i,0)));
 
-                                tempY += ((-2.0/3.0)*feVx_face_values.shape_grad(i,q_point)[0] * old_solutionVx(cell->vertex_dof_index(i,0)) + (4.0/3.0)*feVy_face_values.shape_grad(i,q_point)[1] * old_solutionVy(cell->vertex_dof_index(i,0))/
+                                tempY += ((-2.0/3.0)*feVx_face_values.shape_grad(i,q_point)[0] * old_solutionVx(cell->vertex_dof_index(i,0)) + (4.0/3.0)*feVy_face_values.shape_grad(i,q_point)[1] * old_solutionVy(cell->vertex_dof_index(i,0))
                                                                                                                                               - (2.0/3.0)*feVz_face_values.shape_grad(i,q_point)[2] * old_solutionVz(cell->vertex_dof_index(i,0)));
                                 tempZ += (feVy_face_values.shape_grad(i,q_point)[2] * old_solutionVy(cell->vertex_dof_index(i,0)) + feVz_face_values.shape_grad(i,q_point)[1] * old_solutionVz(cell->vertex_dof_index(i,0)));
 
                             }
                             for (unsigned int i=0; i<dofs_per_cellVy; ++i)
                             {
-                                local_rhsVy(i) += (mu/rho) * time_step * feVy_face_values.shape_value(i,q_point) *(tempX*feVy_face_values.normal_vector(q_point)[0] + tempY*feVy_face_values.normal_vector(q_point)[1] /
+                                local_rhsVy(i) += (mu/rho) * time_step * feVy_face_values.shape_value(i,q_point) *(tempX*feVy_face_values.normal_vector(q_point)[0] + tempY*feVy_face_values.normal_vector(q_point)[1]
                                                                                                                                                                       + tempZ*feVy_face_values.normal_vector(q_point)[2])* feVy_face_values.JxW(q_point);
                             }
                         }
@@ -657,13 +659,13 @@ void riverDischarge::assemble_system()
 
                                 tempY += (feVy_face_values.shape_grad(i,q_point)[2] * old_solutionVy(cell->vertex_dof_index(i,0)) + feVz_face_values.shape_grad(i,q_point)[1] * old_solutionVz(cell->vertex_dof_index(i,0)));
 
-                                tempZ += ((-2.0/3.0)*feVx_face_values.shape_grad(i,q_point)[0] * old_solutionVx(cell->vertex_dof_index(i,0)) - (2.0/3.0)*feVy_face_values.shape_grad(i,q_point)[1] * old_solutionVy(cell->vertex_dof_index(i,0))/
+                                tempZ += ((-2.0/3.0)*feVx_face_values.shape_grad(i,q_point)[0] * old_solutionVx(cell->vertex_dof_index(i,0)) - (2.0/3.0)*feVy_face_values.shape_grad(i,q_point)[1] * old_solutionVy(cell->vertex_dof_index(i,0))
                                                                                                                                                + (4.0/3.0)*feVz_face_values.shape_grad(i,q_point)[2] * old_solutionVz(cell->vertex_dof_index(i,0)));
 
                             }
                             for (unsigned int i=0; i<dofs_per_cellVz; ++i)
                             {
-                                local_rhsVz(i) += (mu/rho) * time_step * feVy_face_values.shape_value(i,q_point) *(tempX*feVy_face_values.normal_vector(q_point)[0] + tempY*feVy_face_values.normal_vector(q_point)[1] /
+                                local_rhsVz(i) += (mu/rho) * time_step * feVy_face_values.shape_value(i,q_point) *(tempX*feVy_face_values.normal_vector(q_point)[0] + tempY*feVy_face_values.normal_vector(q_point)[1]
                                                                                                                                                                       + tempZ*feVy_face_values.normal_vector(q_point)[2])* feVy_face_values.JxW(q_point);
                             }
                         }
