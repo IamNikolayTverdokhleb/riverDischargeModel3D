@@ -147,7 +147,9 @@ void riverDischarge::build_grid ()
 void riverDischarge::import_unv_mesh(){
     GridIn<3> gridin;
     gridin.attach_triangulation(tria);
-    std::ifstream f("/home/andrew/dealii-run/Mesh_repairing/Cube_Mesh_Trial.unv");
+    std::ifstream f("/home/andrew/dealii-run/riverModel3D/repaired3DMesh.unv");
+    // std::ifstream f("/home/andrew/dealii-run/riverModel3D/sea3d.unv");
+    //std::ifstream f("/home/andrew/dealii-run/Mesh_repairing/Cube_Mesh_Trial.unv");
     gridin.read_unv(f);
     //GridOut grid_out;
 
@@ -238,12 +240,14 @@ void riverDischarge::initialize_node_solutions()
             solutionP(cell->vertex_dof_index(i,0))=100000.0-1000.0*9.81*((cell->vertex(i)[2]) - h);
         }
         for (unsigned int face_number = 0; face_number<GeometryInfo<3>::faces_per_cell; ++face_number){
-            if(cell->face(face_number)->at_boundary() && cell->face(face_number)->boundary_id() == 4){
+            /*Discharge area*/
+            if(cell->face(face_number)->at_boundary() && cell->face(face_number)->boundary_id() == 1){
                 for (unsigned int vert=0; vert<GeometryInfo<3>::vertices_per_face; ++vert){
                     solutionSal(cell->face(face_number)->vertex_dof_index(vert,0)) = 0.0;
                     boundaryDoFNumbers.insert(cell->face(face_number)->vertex_dof_index(vert,0));
                 }
-            } else if(cell->face(face_number)->at_boundary() && cell->face(face_number)->boundary_id() == 0  && cell->face(face_number)->boundary_id() == 1 && cell->face(face_number)->boundary_id() == 5){
+            } /*open sea areas*/
+            else if(cell->face(face_number)->at_boundary() && cell->face(face_number)->boundary_id() == 4 && cell->face(face_number)->boundary_id() == 5){
                 for (unsigned int vert=0; vert<GeometryInfo<3>::vertices_per_face; ++vert)
                     openSeaDoFs.emplace(cell->face(face_number)->vertex_dof_index(vert,0), cell->face(face_number)->vertex(vert)[2]);
         }
@@ -345,12 +349,9 @@ void riverDischarge::assemble_system()
                     }//i
                 }//q_index
 
-                unsigned int face_numbe1r=0;
-                auto a = face_numbe1r<GeometryInfo<3>::faces_per_cell;
-                std::cout << "iter "  <<  a << std::endl;
                 for (unsigned int face_number=0; face_number<GeometryInfo<3>::faces_per_cell; ++face_number) {
                     if (cell->face(face_number)->at_boundary() &&
-                        (cell->face(face_number)->boundary_id() == 0 || cell->face(face_number)->boundary_id() == 2)) {
+                        (cell->face(face_number)->boundary_id() == 2 || cell->face(face_number)->boundary_id() == 4) || cell->face(face_number)->boundary_id() == 5){
                         feVy_face_values.reinit(cell, face_number);
                         feVx_face_values.reinit(cell, face_number);
                         feVz_face_values.reinit(cell, face_number);
@@ -377,22 +378,12 @@ void riverDischarge::assemble_system()
                                           old_solutionVz(cell->vertex_dof_index(i, 0)));
 
                             }
-                            std::cout << "tempX = " << tempX << ", tempY = " << tempY << ", tempZ = " << tempZ
-                                      << std::endl;
                             for (unsigned int i = 0; i < dofs_per_cellVx; ++i) {
-                                std::cout << "rhs before:  " << local_rhsVx(i) << std::endl;
-
-                                std::cout << "nx:  " << feVy_face_values.normal_vector(q_point)[0] << std::endl;
-                                std::cout << "ny:  " << feVy_face_values.normal_vector(q_point)[1] << std::endl;
-                                std::cout << "nz:  " << feVy_face_values.normal_vector(q_point)[2] << std::endl;
-                                std::cout << "Fe_V:  " << feVy_face_values.shape_value(i, q_point) << std::endl;
-                                std::cout << "Integral :  " << feVy_face_values.JxW(q_point) << std::endl;
                                 local_rhsVx(i) += (mu / rho) * time_step * feVy_face_values.shape_value(i, q_point) *
                                                   (tempX * feVy_face_values.normal_vector(q_point)[0] +
                                                    tempY * feVy_face_values.normal_vector(q_point)[1]
                                                    +tempZ * feVy_face_values.normal_vector(q_point)[2]) *
                                                   feVy_face_values.JxW(q_point);
-                                std::cout << "rhs:  " << local_rhsVx(i) << std::endl;
                             }
                         }
                     }
@@ -424,15 +415,15 @@ void riverDischarge::assemble_system()
             }//cell
         }//Vx
         
-        /*std::map<types::global_dof_index,double> boundary_valuesVx0;
+        std::map<types::global_dof_index,double> boundary_valuesVx0;
         VectorTools::interpolate_boundary_values (dof_handlerVx, 0, ConstantFunction<3>(0.0), boundary_valuesVx0);
         MatrixTools::apply_boundary_values (boundary_valuesVx0, system_mVx,    predictionVx,    system_rVx);
         
         std::map<types::global_dof_index,double> boundary_valuesVx1;
-        VectorTools::interpolate_boundary_values (dof_handlerVx, 1, ConstantFunction<3>(0.0), boundary_valuesVx1);
+        VectorTools::interpolate_boundary_values (dof_handlerVx, 1, ConstantFunction<3>(3.0), boundary_valuesVx1);
         MatrixTools::apply_boundary_values (boundary_valuesVx1, system_mVx, predictionVx, system_rVx);
 
-        std::map<types::global_dof_index,double> boundary_valuesVx2;
+  /*      std::map<types::global_dof_index,double> boundary_valuesVx2;
         VectorTools::interpolate_boundary_values (dof_handlerVx, 2, ConstantFunction<3>(0.0), boundary_valuesVx2);
         MatrixTools::apply_boundary_values (boundary_valuesVx2, system_mVx, predictionVx, system_rVx);
 */
@@ -440,12 +431,12 @@ void riverDischarge::assemble_system()
         VectorTools::interpolate_boundary_values (dof_handlerVx, 3, ConstantFunction<3>(0.0), boundary_valuesVx3);
         MatrixTools::apply_boundary_values (boundary_valuesVx3, system_mVx, predictionVx, system_rVx);
 
-        std::map<types::global_dof_index,double> boundary_valuesVx4;
+     /*   std::map<types::global_dof_index,double> boundary_valuesVx4;
         VectorTools::interpolate_boundary_values (dof_handlerVx, 4, ConstantFunction<3>(3.0), boundary_valuesVx4);
         MatrixTools::apply_boundary_values (boundary_valuesVx4, system_mVx, predictionVx, system_rVx);
 
 
-      /*  std::map<types::global_dof_index,double> boundary_valuesVx5;
+      / std::map<types::global_dof_index,double> boundary_valuesVx5;
         VectorTools::interpolate_boundary_values (dof_handlerVx, 5, ConstantFunction<3>(0.0), boundary_valuesVx5);
         MatrixTools::apply_boundary_values (boundary_valuesVx5, system_mVx, predictionVx, system_rVx);
 
@@ -510,7 +501,8 @@ void riverDischarge::assemble_system()
                 }//q_index
 
                 for (unsigned int face_number=0; face_number<GeometryInfo<3>::faces_per_cell; ++face_number)
-                    if (cell->face(face_number)->at_boundary() /*&& (cell->face(face_number)->boundary_id() == 0 || cell->face(face_number)->boundary_id() == 2)*/){
+                    if (cell->face(face_number)->at_boundary() &&
+                        (cell->face(face_number)->boundary_id() == 2 || cell->face(face_number)->boundary_id() == 4) || cell->face(face_number)->boundary_id() == 5){
                         feVy_face_values.reinit (cell, face_number);
                         feVx_face_values.reinit (cell, face_number);
                         feVz_face_values.reinit (cell, face_number);
@@ -567,7 +559,7 @@ void riverDischarge::assemble_system()
             }//cell
         }//Vy
         
-        /*std::map<types::global_dof_index,double> boundary_valuesVy0;
+        std::map<types::global_dof_index,double> boundary_valuesVy0;
         VectorTools::interpolate_boundary_values (dof_handlerVy, 0, ConstantFunction<3>(0.0), boundary_valuesVy0);
         MatrixTools::apply_boundary_values (boundary_valuesVy0, system_mVy, predictionVy, system_rVy);
         
@@ -575,18 +567,18 @@ void riverDischarge::assemble_system()
         VectorTools::interpolate_boundary_values (dof_handlerVy, 1, ConstantFunction<3>(0.0), boundary_valuesVy1);
         MatrixTools::apply_boundary_values (boundary_valuesVy1, system_mVy, predictionVy, system_rVy);
         
-        std::map<types::global_dof_index,double> boundary_valuesVy2;
+       /* std::map<types::global_dof_index,double> boundary_valuesVy2;
         VectorTools::interpolate_boundary_values (dof_handlerVy, 2, ConstantFunction<3>(0.0), boundary_valuesVy2);
         MatrixTools::apply_boundary_values (boundary_valuesVy2, system_mVy, predictionVy, system_rVy);
-*/
+        */
         std::map<types::global_dof_index,double> boundary_valuesVy3;
         VectorTools::interpolate_boundary_values (dof_handlerVy, 3, ConstantFunction<3>(0.0), boundary_valuesVy3);
         MatrixTools::apply_boundary_values (boundary_valuesVy3, system_mVy, predictionVy, system_rVy);
 
-        std::map<types::global_dof_index,double> boundary_valuesVy4;
-        VectorTools::interpolate_boundary_values (dof_handlerVy, 4, ConstantFunction<3>(3.0), boundary_valuesVy4);
+     /*   std::map<types::global_dof_index,double> boundary_valuesVy4;
+        VectorTools::interpolate_boundary_values (dof_handlerVy, 1, ConstantFunction<3>(0.0), boundary_valuesVy4);
         MatrixTools::apply_boundary_values (boundary_valuesVy4, system_mVy, predictionVy, system_rVy);
-/*
+
         std::map<types::global_dof_index,double> boundary_valuesVy5;
         VectorTools::interpolate_boundary_values (dof_handlerVy, 5, ConstantFunction<3>(0.0), boundary_valuesVy5);
         MatrixTools::apply_boundary_values (boundary_valuesVy5, system_mVy, predictionVy, system_rVy);
@@ -645,7 +637,8 @@ void riverDischarge::assemble_system()
                 }//q_index
 
                 for (unsigned int face_number=0; face_number<GeometryInfo<3>::faces_per_cell; ++face_number)
-                    if (cell->face(face_number)->at_boundary() /*&& (cell->face(face_number)->boundary_id() == 0 || cell->face(face_number)->boundary_id() == 2)*/){
+                    if (cell->face(face_number)->at_boundary() &&
+                        (cell->face(face_number)->boundary_id() == 2 || cell->face(face_number)->boundary_id() == 4) || cell->face(face_number)->boundary_id() == 5){
                         feVy_face_values.reinit (cell, face_number);
                         feVx_face_values.reinit (cell, face_number);
                         feVz_face_values.reinit (cell, face_number);
@@ -703,22 +696,22 @@ void riverDischarge::assemble_system()
             }//cell
         }//Vz
 
-  /*      std::map<types::global_dof_index,double> boundary_valuesVz0;
+       std::map<types::global_dof_index,double> boundary_valuesVz0;
         VectorTools::interpolate_boundary_values (dof_handlerVz, 0, ConstantFunction<3>(0.0), boundary_valuesVz0);
         MatrixTools::apply_boundary_values (boundary_valuesVz0, system_mVz, predictionVz, system_rVz);
 
         std::map<types::global_dof_index,double> boundary_valuesVz1;
         VectorTools::interpolate_boundary_values (dof_handlerVz, 1, ConstantFunction<3>(0.0), boundary_valuesVz1);
         MatrixTools::apply_boundary_values (boundary_valuesVz1, system_mVz, predictionVz, system_rVz);
-*/
+
         std::map<types::global_dof_index,double> boundary_valuesVz2;
         VectorTools::interpolate_boundary_values (dof_handlerVz, 2, ConstantFunction<3>(0.0), boundary_valuesVz2);
         MatrixTools::apply_boundary_values (boundary_valuesVz2, system_mVz, predictionVz, system_rVz);
-/*
+
         std::map<types::global_dof_index,double> boundary_valuesVz3;
         VectorTools::interpolate_boundary_values (dof_handlerVz, 3, ConstantFunction<3>(0.0), boundary_valuesVz3);
         MatrixTools::apply_boundary_values (boundary_valuesVz3, system_mVz, predictionVz, system_rVz);
-
+/*
         std::map<types::global_dof_index,double> boundary_valuesVz4;
         VectorTools::interpolate_boundary_values (dof_handlerVz, 4, ConstantFunction<3>(0.0), boundary_valuesVz4);
         MatrixTools::apply_boundary_values (boundary_valuesVz4, system_mVz, predictionVz, system_rVz);
@@ -769,8 +762,8 @@ void riverDischarge::assemble_system()
                                 for (unsigned int i=0; i<dofs_per_cellP; ++i)
                                     local_rhsP(i) -= rho / time_step * feP_face_values.shape_value(i,q_point) * (3.0) *    //СКОРОСТЬ В МЕСТЕ ВПАДЕНИЯ
 										feP_face_values.normal_vector(q_point)[0] * feP_face_values.JxW(q_point);
-                        } else */if (cell->face(face_number)->at_boundary() && (cell->face(face_number)->boundary_id() == 0 || cell->face(face_number)->boundary_id() == 1 || cell->face(face_number)->boundary_id() == 2 || cell->face(face_number)->boundary_id() == 3 ||\
-                        cell->face(face_number)->boundary_id() == 4 || cell->face(face_number)->boundary_id() == 5)){
+                        } else */if (cell->face(face_number)->at_boundary() &&
+                                     (cell->face(face_number)->boundary_id() == 1 || (cell->face(face_number)->boundary_id() == 2 || cell->face(face_number)->boundary_id() == 4) || cell->face(face_number)->boundary_id() == 5)){
                             feP_face_values.reinit (cell, face_number);
                             feVx_face_values.reinit (cell, face_number);
                             feVy_face_values.reinit (cell, face_number);
@@ -855,16 +848,16 @@ void riverDischarge::assemble_system()
                     for (unsigned int i=0; i<dofs_per_cellVx; ++i)
                         system_rVx(local_dof_indicesVx[i]) += local_rhsVx(i);
                 }//cell
-/*
+
                 std::map<types::global_dof_index,double> boundary_valuesVx0;
                 VectorTools::interpolate_boundary_values (dof_handlerVx, 0, ConstantFunction<3>(0.0), boundary_valuesVx0);
                 MatrixTools::apply_boundary_values (boundary_valuesVx0, system_mVx,  correctionVx,    system_rVx);
 
                 std::map<types::global_dof_index,double> boundary_valuesVx1;
-                VectorTools::interpolate_boundary_values (dof_handlerVx, 1, ConstantFunction<3>(0.0), boundary_valuesVx1);
+                VectorTools::interpolate_boundary_values (dof_handlerVx, 1, ConstantFunction<3>(3.0), boundary_valuesVx1);
                 MatrixTools::apply_boundary_values (boundary_valuesVx1, system_mVx, correctionVx, system_rVx);
 
-                std::map<types::global_dof_index,double> boundary_valuesVx2;
+/*                std::map<types::global_dof_index,double> boundary_valuesVx2;
                 VectorTools::interpolate_boundary_values (dof_handlerVx, 2, ConstantFunction<3>(0.0), boundary_valuesVx2);
                 MatrixTools::apply_boundary_values (boundary_valuesVx2, system_mVx, correctionVx, system_rVx);
 */
@@ -872,10 +865,10 @@ void riverDischarge::assemble_system()
                 VectorTools::interpolate_boundary_values (dof_handlerVx, 3, ConstantFunction<3>(0.0), boundary_valuesVx3);
                 MatrixTools::apply_boundary_values (boundary_valuesVx3, system_mVx, correctionVx, system_rVx);
 
-                std::map<types::global_dof_index,double> boundary_valuesVx4;
-                VectorTools::interpolate_boundary_values (dof_handlerVx, 4, ConstantFunction<3>(4.0), boundary_valuesVx4);
+              /*  std::map<types::global_dof_index,double> boundary_valuesVx4;
+                VectorTools::interpolate_boundary_values (dof_handlerVx, 4, ConstantFunction<3>(3.0), boundary_valuesVx4);
                 MatrixTools::apply_boundary_values (boundary_valuesVx4, system_mVx, correctionVx, system_rVx);
-
+*/
 /*
                 std::map<types::global_dof_index,double> boundary_valuesVx5;
                 VectorTools::interpolate_boundary_values (dof_handlerVx, 5, ConstantFunction<3>(0.0), boundary_valuesVx5);
@@ -931,7 +924,7 @@ void riverDischarge::assemble_system()
                     for (unsigned int i=0; i<dofs_per_cellVy; ++i)
                         system_rVy(local_dof_indicesVy[i]) += local_rhsVy(i);
                 }//cell
-/*
+
                 std::map<types::global_dof_index,double> boundary_valuesVy0;
                 VectorTools::interpolate_boundary_values (dof_handlerVy, 0, ConstantFunction<3>(0.0), boundary_valuesVy0);
                 MatrixTools::apply_boundary_values (boundary_valuesVy0, system_mVy, correctionVy, system_rVy);
@@ -939,7 +932,7 @@ void riverDischarge::assemble_system()
                 std::map<types::global_dof_index,double> boundary_valuesVy1;
                 VectorTools::interpolate_boundary_values (dof_handlerVy, 1, ConstantFunction<3>(0.0), boundary_valuesVy1);
                 MatrixTools::apply_boundary_values (boundary_valuesVy1, system_mVy, correctionVy, system_rVy);
-
+/*
                 std::map<types::global_dof_index,double> boundary_valuesVy2;
                 VectorTools::interpolate_boundary_values (dof_handlerVy, 2, ConstantFunction<3>(0.0), boundary_valuesVy2);
                 MatrixTools::apply_boundary_values (boundary_valuesVy2, system_mVy, correctionVy, system_rVy);
@@ -948,9 +941,9 @@ void riverDischarge::assemble_system()
                 VectorTools::interpolate_boundary_values (dof_handlerVy, 3, ConstantFunction<3>(0.0), boundary_valuesVy3);
                 MatrixTools::apply_boundary_values (boundary_valuesVy3, system_mVy, correctionVy, system_rVy);
 
-                std::map<types::global_dof_index,double> boundary_valuesVy4;
-                VectorTools::interpolate_boundary_values (dof_handlerVy, 4, ConstantFunction<3>(3.0), boundary_valuesVy4);
-                MatrixTools::apply_boundary_values (boundary_valuesVy4, system_mVy, correctionVy, system_rVy);
+        /*        std::map<types::global_dof_index,double> boundary_valuesVy4;
+                VectorTools::interpolate_boundary_values (dof_handlerVy, 4, ConstantFunction<3>(0.0), boundary_valuesVy4);
+                MatrixTools::apply_boundary_values (boundary_valuesVy4, system_mVy, correctionVy, system_rVy);*/
 /*
                 std::map<types::global_dof_index,double> boundary_valuesVy5;
                 VectorTools::interpolate_boundary_values (dof_handlerVy, 5, ConstantFunction<3>(0.0), boundary_valuesVy5);
@@ -1002,7 +995,7 @@ void riverDischarge::assemble_system()
                 for (unsigned int i=0; i<dofs_per_cellVz; ++i)
                     system_rVz(local_dof_indicesVz[i]) += local_rhsVz(i);
             }//cell
-/*
+
             std::map<types::global_dof_index,double> boundary_valuesVz0;
             VectorTools::interpolate_boundary_values (dof_handlerVz, 0, ConstantFunction<3>(0.0), boundary_valuesVz0);
             MatrixTools::apply_boundary_values (boundary_valuesVz0, system_mVz, correctionVz, system_rVz);
@@ -1010,15 +1003,15 @@ void riverDischarge::assemble_system()
             std::map<types::global_dof_index,double> boundary_valuesVz1;
             VectorTools::interpolate_boundary_values (dof_handlerVz, 1, ConstantFunction<3>(0.0), boundary_valuesVz1);
             MatrixTools::apply_boundary_values (boundary_valuesVz1, system_mVz, correctionVz, system_rVz);
-*/
+
             std::map<types::global_dof_index,double> boundary_valuesVz2;
             VectorTools::interpolate_boundary_values (dof_handlerVz, 2, ConstantFunction<3>(0.0), boundary_valuesVz2);
             MatrixTools::apply_boundary_values (boundary_valuesVz2, system_mVz, correctionVz, system_rVz);
-/*
+
             std::map<types::global_dof_index,double> boundary_valuesVz3;
             VectorTools::interpolate_boundary_values (dof_handlerVz, 3, ConstantFunction<3>(0.0), boundary_valuesVz3);
             MatrixTools::apply_boundary_values (boundary_valuesVz3, system_mVz, correctionVz, system_rVz);
-
+/*
             std::map<types::global_dof_index,double> boundary_valuesVz4;
             VectorTools::interpolate_boundary_values (dof_handlerVz, 4, ConstantFunction<3>(0.0), boundary_valuesVz4);
             MatrixTools::apply_boundary_values (boundary_valuesVz4, system_mVz, correctionVz, system_rVz);
@@ -1214,7 +1207,7 @@ void riverDischarge::run()
         distribute_particle_velocities_to_grid();
         
         assemble_system();
-       if((timestep_number - 1) % 100 == 0)
+      // if((timestep_number - 1) % 100 == 0)
 		output_results();
 
         timer->print_summary();
