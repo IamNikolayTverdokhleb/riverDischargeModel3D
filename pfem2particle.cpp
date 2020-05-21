@@ -513,7 +513,7 @@ void pfem2Solver::seed_particles_into_cell (const typename DoFHandler<3>::cell_i
                         Point<3>((i + 1.0 / 2) * hx, (j + 1.0 / 2) * hy, (k + 1.0 / 2) * hz), ++particleCount);
                 particle_handler.insert_particle(particle, cell);
 
-                for (unsigned int vertex = 0; vertex < GeometryInfo<2>::vertices_per_cell; ++vertex) {
+                for (unsigned int vertex = 0; vertex < GeometryInfo<3>::vertices_per_cell; ++vertex) {
                     shapeValue = fe.shape_value(vertex, particle->get_reference_location());
 
                     particle->set_velocity_component(particle->get_velocity_component(0) +
@@ -656,7 +656,7 @@ void pfem2Solver::move_particles() //перенос частиц
 
 				vel_in_part = Tensor<1,3> ({0,0,0});
 				
-				for (unsigned int vertex=0; vertex<GeometryInfo<2>::vertices_per_cell; ++vertex){
+				for (unsigned int vertex=0; vertex<GeometryInfo<3>::vertices_per_cell; ++vertex){
 					shapeValue = fe.shape_value(vertex, (*particleIndex).second->get_reference_location());
 					vel_in_part[0] += shapeValue * solutionVx(cell->vertex_dof_index(vertex,0));
 					vel_in_part[1] += shapeValue * solutionVy(cell->vertex_dof_index(vertex,0));

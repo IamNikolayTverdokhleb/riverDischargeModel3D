@@ -420,7 +420,7 @@ void riverDischarge::assemble_system()
         MatrixTools::apply_boundary_values (boundary_valuesVx0, system_mVx,    predictionVx,    system_rVx);
         
         std::map<types::global_dof_index,double> boundary_valuesVx1;
-        VectorTools::interpolate_boundary_values (dof_handlerVx, 1, ConstantFunction<3>(3.0), boundary_valuesVx1);
+        VectorTools::interpolate_boundary_values (dof_handlerVx, 1, ConstantFunction<3>(0.0), boundary_valuesVx1);
         MatrixTools::apply_boundary_values (boundary_valuesVx1, system_mVx, predictionVx, system_rVx);
 
   /*      std::map<types::global_dof_index,double> boundary_valuesVx2;
@@ -564,7 +564,7 @@ void riverDischarge::assemble_system()
         MatrixTools::apply_boundary_values (boundary_valuesVy0, system_mVy, predictionVy, system_rVy);
         
         std::map<types::global_dof_index,double> boundary_valuesVy1;
-        VectorTools::interpolate_boundary_values (dof_handlerVy, 1, ConstantFunction<3>(0.0), boundary_valuesVy1);
+        VectorTools::interpolate_boundary_values (dof_handlerVy, 1, ConstantFunction<3>(3.0), boundary_valuesVy1);
         MatrixTools::apply_boundary_values (boundary_valuesVy1, system_mVy, predictionVy, system_rVy);
         
        /* std::map<types::global_dof_index,double> boundary_valuesVy2;
@@ -854,7 +854,7 @@ void riverDischarge::assemble_system()
                 MatrixTools::apply_boundary_values (boundary_valuesVx0, system_mVx,  correctionVx,    system_rVx);
 
                 std::map<types::global_dof_index,double> boundary_valuesVx1;
-                VectorTools::interpolate_boundary_values (dof_handlerVx, 1, ConstantFunction<3>(3.0), boundary_valuesVx1);
+                VectorTools::interpolate_boundary_values (dof_handlerVx, 1, ConstantFunction<3>(0.0), boundary_valuesVx1);
                 MatrixTools::apply_boundary_values (boundary_valuesVx1, system_mVx, correctionVx, system_rVx);
 
 /*                std::map<types::global_dof_index,double> boundary_valuesVx2;
@@ -930,7 +930,7 @@ void riverDischarge::assemble_system()
                 MatrixTools::apply_boundary_values (boundary_valuesVy0, system_mVy, correctionVy, system_rVy);
 
                 std::map<types::global_dof_index,double> boundary_valuesVy1;
-                VectorTools::interpolate_boundary_values (dof_handlerVy, 1, ConstantFunction<3>(0.0), boundary_valuesVy1);
+                VectorTools::interpolate_boundary_values (dof_handlerVy, 1, ConstantFunction<3>(3.0), boundary_valuesVy1);
                 MatrixTools::apply_boundary_values (boundary_valuesVy1, system_mVy, correctionVy, system_rVy);
 /*
                 std::map<types::global_dof_index,double> boundary_valuesVy2;
@@ -1126,7 +1126,6 @@ void riverDischarge::output_results(bool predictionCorrection)
         data_out.add_data_vector (correctionVx, "corVx");
         data_out.add_data_vector (correctionVy, "corVy");
         data_out.add_data_vector (correctionVz, "corVz");
-
     }
     
     data_out.build_patches ();
@@ -1207,7 +1206,7 @@ void riverDischarge::run()
         distribute_particle_velocities_to_grid();
         
         assemble_system();
-      // if((timestep_number - 1) % 100 == 0)
+        if((timestep_number - 1) % 100 == 0)
 		output_results();
 
         timer->print_summary();
