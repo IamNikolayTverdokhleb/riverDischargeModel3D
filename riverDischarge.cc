@@ -1115,7 +1115,7 @@ void riverDischarge::output_results(bool predictionCorrection)
     data_out.attach_dof_handler (dof_handlerVx);
     data_out.add_data_vector (solutionVx, "Vx");
     data_out.add_data_vector (solutionVy, "Vy");
-    data_out.add_data_vector (solutionVy, "Vz");
+    data_out.add_data_vector (solutionVz, "Vz");
     data_out.add_data_vector (solutionP, "P");
     data_out.add_data_vector (solutionSal, "Salinity");
     
