@@ -236,7 +236,7 @@ void riverDischarge::initialize_node_solutions()
     double h{4.0}; //height of waterline
     
     for (; cell != endc; ++cell) {
-        for (unsigned int i=0; i<4; ++i) {
+        for (unsigned int i=0; i<<GeometryInfo<3>::vertices_per_cell; ++i) {
             solutionP(cell->vertex_dof_index(i,0))=100000.0-1000.0*9.81*((cell->vertex(i)[2]) - h);
         }
         for (unsigned int face_number = 0; face_number<GeometryInfo<3>::faces_per_cell; ++face_number){
@@ -340,8 +340,8 @@ void riverDischarge::assemble_system()
                             
                             //explicit account for tau_ij
                             //local_rhsVx(i) -= mu * time_step * (Ni_vel_grad[1] * Nj_vel_grad[1] + 4.0/3.0 * Ni_vel_grad[0] * Nj_vel_grad[0]) * old_solutionVx(cell->vertex_dof_index(j,0)) * feVx_values.JxW (q_index);
-                            local_rhsVx(i) -= mu/rho * time_step * ((Ni_vel_grad[1] * Nj_vel_grad[0] - 2.0/3.0 * Ni_vel_grad[0] * Nj_vel_grad[1]) * old_solutionVy(cell->vertex_dof_index(j,0)) +
-                                    (Ni_vel_grad[2] * Nj_vel_grad[0] - 2.0/3.0 * Ni_vel_grad[2] * Nj_vel_grad[1])) * old_solutionVz(cell->vertex_dof_index(j,0))* feVx_values.JxW (q_index);
+                            local_rhsVx(i) -= mu/rho * time_step * (((Ni_vel_grad[1] * Nj_vel_grad[0] - 2.0/3.0 * Ni_vel_grad[0] * Nj_vel_grad[1]) * old_solutionVy(cell->vertex_dof_index(j,0)) +
+                                    (Ni_vel_grad[2] * Nj_vel_grad[0] - 2.0/3.0 * Ni_vel_grad[0] * Nj_vel_grad[2]) * old_solutionVz(cell->vertex_dof_index(j,0)))* feVx_values.JxW (q_index);
                             //local_rhsVx(i) -= time_step / rho * Ni_vel * Nj_p_grad[0] * old_solutionP(cell->vertex_dof_index(j,0)) * feVx_values.JxW (q_index);
                             
                             local_rhsVx(i) += Nj_vel * Ni_vel * old_solutionVx(cell->vertex_dof_index(j,0)) * feVx_values.JxW (q_index);
@@ -930,7 +930,7 @@ void riverDischarge::assemble_system()
                 MatrixTools::apply_boundary_values (boundary_valuesVy0, system_mVy, correctionVy, system_rVy);
 
                 std::map<types::global_dof_index,double> boundary_valuesVy1;
-                VectorTools::interpolate_boundary_values (dof_handlerVy, 1, ConstantFunction<3>(3.0), boundary_valuesVy1);
+                VectorTools::interpolate_boundary_values (dof_handlerVy, 1, ConstantFunction<3>(0.0), boundary_valuesVy1);
                 MatrixTools::apply_boundary_values (boundary_valuesVy1, system_mVy, correctionVy, system_rVy);
 /*
                 std::map<types::global_dof_index,double> boundary_valuesVy2;
