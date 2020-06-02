@@ -50,7 +50,7 @@ private:
 
 double parabolicBC::value(const Point<3> &p, const unsigned int) const
 {
-	return  (_time > 10.0 ? 1.0 : _time / 10.0) *   (3.0 * sqrt(2 * p[1] + 1.0) );
+	return  (_time > 10.0 ? 1.0 : _time / 10.0) *   (3.0 * sqrt(2 * p[2] - 8.0) );
 }
 
 //double parabolicBC::ddy(const Point<2> &p) const
@@ -91,7 +91,7 @@ riverDischarge::riverDischarge()
     //theta (0.5)
     //alpha (0.65)
     time = 0.0;
-    time_step = 0.01;
+    time_step = 0.1;
     timestep_number = 1;
 }
 
@@ -147,7 +147,9 @@ void riverDischarge::build_grid ()
 void riverDischarge::import_unv_mesh(){
     GridIn<3> gridin;
     gridin.attach_triangulation(tria);
-    std::ifstream f("/home/andrew/dealii-run/riverModel3D/repaired3DMesh.unv");
+    //std::ifstream f("/home/andrew/dealii-run/riverModel3D/repaired3DMesh.unv");
+    std::ifstream f("/home/andrew/dealii-run/riverModel3D/sea3d-whole.unv");
+
     // std::ifstream f("/home/andrew/dealii-run/riverModel3D/sea3d.unv");
     //std::ifstream f("/home/andrew/dealii-run/Mesh_repairing/Cube_Mesh_Trial.unv");
     gridin.read_unv(f);
@@ -340,7 +342,7 @@ void riverDischarge::assemble_system()
                             
                             //explicit account for tau_ij
                             //local_rhsVx(i) -= mu * time_step * (Ni_vel_grad[1] * Nj_vel_grad[1] + 4.0/3.0 * Ni_vel_grad[0] * Nj_vel_grad[0]) * old_solutionVx(cell->vertex_dof_index(j,0)) * feVx_values.JxW (q_index);
-                            local_rhsVx(i) -= mu/rho * time_step * (((Ni_vel_grad[1] * Nj_vel_grad[0] - 2.0/3.0 * Ni_vel_grad[0] * Nj_vel_grad[1]) * old_solutionVy(cell->vertex_dof_index(j,0)) +
+                            local_rhsVx(i) -= mu/rho * time_step * ((Ni_vel_grad[1] * Nj_vel_grad[0] - 2.0/3.0 * Ni_vel_grad[0] * Nj_vel_grad[1]) * old_solutionVy(cell->vertex_dof_index(j,0)) +
                                     (Ni_vel_grad[2] * Nj_vel_grad[0] - 2.0/3.0 * Ni_vel_grad[0] * Nj_vel_grad[2]) * old_solutionVz(cell->vertex_dof_index(j,0)))* feVx_values.JxW (q_index);
                             //local_rhsVx(i) -= time_step / rho * Ni_vel * Nj_p_grad[0] * old_solutionP(cell->vertex_dof_index(j,0)) * feVx_values.JxW (q_index);
                             
@@ -564,7 +566,7 @@ void riverDischarge::assemble_system()
         MatrixTools::apply_boundary_values (boundary_valuesVy0, system_mVy, predictionVy, system_rVy);
         
         std::map<types::global_dof_index,double> boundary_valuesVy1;
-        VectorTools::interpolate_boundary_values (dof_handlerVy, 1, ConstantFunction<3>(3.0), boundary_valuesVy1);
+        VectorTools::interpolate_boundary_values (dof_handlerVy, 1, parabolicBC(time), boundary_valuesVy1);
         MatrixTools::apply_boundary_values (boundary_valuesVy1, system_mVy, predictionVy, system_rVy);
         
        /* std::map<types::global_dof_index,double> boundary_valuesVy2;
@@ -1206,7 +1208,7 @@ void riverDischarge::run()
         distribute_particle_velocities_to_grid();
         
         assemble_system();
-        if((timestep_number - 1) % 100 == 0)
+        if((timestep_number - 1) % 10 == 0)
 		output_results();
 
         timer->print_summary();
