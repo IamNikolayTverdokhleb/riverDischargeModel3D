@@ -4,6 +4,8 @@
 #define PARTICLES_MOVEMENT_STEPS 3
 #define MAX_PARTICLES_PER_CELL_PART 3
 
+#define PROJECTION_FUNCTIONS_DEGREE 1
+
 #include <iostream>
 #include <fstream>
 #include <cmath>
@@ -104,6 +106,11 @@ public:
     std::unordered_multimap<int, pfem2Particle*>::iterator particles_in_cell_begin(const typename Triangulation<3>::active_cell_iterator &cell);
     std::unordered_multimap<int, pfem2Particle*>::iterator particles_in_cell_end(const typename Triangulation<3>::active_cell_iterator &cell);
     
+    std::vector<std::set<typename Triangulation<3>::active_cell_iterator>> vertex_to_cells;
+    std::vector<std::vector<Tensor<1,3>>> vertex_to_cell_centers;
+    
+    void initialize_maps();
+    
 private:
     SmartPointer<const parallel::distributed::Triangulation<3>, pfem2ParticleHandler> triangulation;
     SmartPointer<const Mapping<3>,pfem2ParticleHandler> mapping;
@@ -163,14 +170,11 @@ public:
 	 */
 	void move_particles();
 	
-	void calculate_loads(types::boundary_id patch_id, std::ofstream *out);
-	
 	double time,time_step;							//!< Шаг решения задачи методом конечных элементов
 	int timestep_number;
 	
 	Vector<double> solutionVx, solutionVy, solutionVz, solutionP, correctionVx, correctionVy, correctionVz, predictionVx, predictionVy, predictionVz, solutionSal;	//!< Вектор решения, коррекции и прогноза на текущем шаге по времени
 	Vector<double> old_solutionVx, old_solutionVy, old_solutionVz, old_solutionP;		//!< Вектор решения на предыдущем шаге по времени (используется для вычисления разности с текущим и последующей коррекции скоростей частиц)
-	Vector<double> vel_in_px, vel_in_py,  vel_in_pz;
 	
 	parallel::distributed::Triangulation<3> tria;
 	MappingQ1<3> mapping;
@@ -185,14 +189,20 @@ public:
     std::set<unsigned int> boundaryDoFNumbers;	//номера степеней свободы, соленость в которых необходимо принудительно обнулять (место впадения реки)
     std::unordered_map<unsigned int, double> openSeaDoFs;	//номера степеней свободы, в которых надо проверять знак горизонтальной скорости для смены типа ГУ ("открытое море"), и их координата z
 	
+	std::unordered_map<unsigned int, unsigned int> verticesDoFnumbers;
+	
 protected:
 	void seed_particles_into_cell (const typename DoFHandler<3>::cell_iterator &cell);
 	bool check_cell_for_empty_parts (const typename DoFHandler<3>::cell_iterator &cell);
+	
+	double h;
 	
 private:	
 	std::vector < unsigned int > quantities;
 	int particleCount = 0;
 	time_t solutionTime, startTime;
+	
+	unsigned int projection_func_count;
 };
 
 bool compare_particle_association(const unsigned int a, const unsigned int b, const Tensor<1,3> &particle_direction, const std::vector<Tensor<1,3> > &center_directions);
